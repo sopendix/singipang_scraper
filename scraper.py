@@ -13,8 +13,8 @@ CONFIG = {
     'KEYWORD_TITLE_PART': '출석체크',
     'KEYWORD_COMMENT': 'musinsa',
     # Days back mode (Easy)
-    'USE_DATE_RANGE': True, # If True, use START_DATE ~ END_DATE. If False, use CHECK_DAYS_BACK.
-    'CHECK_DAYS_BACK': 30,
+    'USE_DATE_RANGE': False, # If True, use START_DATE ~ END_DATE. If False, use CHECK_DAYS_BACK.
+    'CHECK_DAYS_BACK': 2,
 
     # Date Range mode (Specific) - format: 'MMDD' (e.g., '0201')
     'START_DATE': '0101', 
@@ -269,3 +269,4 @@ if __name__ == "__main__":
     while True:
         schedule.run_pending()
         time.sleep(1)
+

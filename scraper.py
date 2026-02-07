@@ -254,7 +254,7 @@ def send_to_gas(items, mmdd):
     }
     
     try:
-        response = requests.post(CONFIG['GAS_WEB_APP_URL'], json=payload, timeout=15)
+        response = requests.post(CONFIG['GAS_WEB_APP_URL'], json=payload, timeout=120)
         print(f"  [Upload] Sent to GAS: {response.text}")
     except Exception as e:
         print(f"  [Error] Sending to GAS: {e}")
@@ -269,4 +269,5 @@ if __name__ == "__main__":
     while True:
         schedule.run_pending()
         time.sleep(1)
+
 

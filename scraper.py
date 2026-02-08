@@ -14,7 +14,7 @@ CONFIG = {
     'KEYWORD_COMMENT': 'musinsa',
     # Days back mode (Easy)
     'USE_DATE_RANGE': False, # If True, use START_DATE ~ END_DATE. If False, use CHECK_DAYS_BACK.
-    'CHECK_DAYS_BACK': 2,
+    'CHECK_DAYS_BACK': 3,
 
     # Date Range mode (Specific) - format: 'MMDD' (e.g., '0201')
     'START_DATE': '0101', 
@@ -77,7 +77,11 @@ def run_scraper():
     with sync_playwright() as p:
         state_file = "state.json"
         
-        browser = p.chromium.launch(headless=False) 
+        # Detect GitHub Actions environment
+        headless_mode = os.getenv('GITHUB_ACTIONS') == 'true'
+        print(f"  [Info] Headless Mode: {headless_mode}")
+        
+        browser = p.chromium.launch(headless=headless_mode) 
         
         context_args = {
             "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -269,5 +273,3 @@ if __name__ == "__main__":
     while True:
         schedule.run_pending()
         time.sleep(1)
-
-

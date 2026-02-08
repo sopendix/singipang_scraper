@@ -2,9 +2,9 @@ name: Quiz Link Scraper
 
 on:
   schedule:
-    # 매일 한국 시간 09:00, 18:00 실행 (UTC 00:00, 09:00)
+    # 매일 한국 시간 09:00, 21:00 실행 (UTC 00:00, 12:00)
     - cron: '0 0 * * *'
-    - cron: '0 9 * * *'
+    - cron: '0 12 * * *'
   workflow_dispatch: # 수동 실행 버튼
 
 jobs:

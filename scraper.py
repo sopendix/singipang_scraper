@@ -72,6 +72,12 @@ def save_keycodes(items):
         print(f"  [Local] Saved {count} keyCodes to {km_file}")
 
 def run_scraper():
+    # GitHub Actions Environment Override
+    if os.getenv('GITHUB_ACTIONS') == 'true':
+        print("  [Info] GitHub Actions detected: Forcing DAILY mode (Latest 2 days).")
+        CONFIG['USE_DATE_RANGE'] = False
+        CONFIG['CHECK_DAYS_BACK'] = 2 # Check today + yesterday (09:00, 21:00)
+    
     print(f"\n[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting Playwright Scan...")
     
     with sync_playwright() as p:

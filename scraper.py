@@ -14,7 +14,7 @@ CONFIG = {
     'KEYWORD_COMMENT': 'musinsa',
     # Days back mode (Easy)
     'USE_DATE_RANGE': False, # If True, use START_DATE ~ END_DATE. If False, use CHECK_DAYS_BACK.
-    'CHECK_DAYS_BACK': 3,
+    'CHECK_DAYS_BACK': 2,
 
     # Date Range mode (Specific) - format: 'MMDD' (e.g., '0201')
     'START_DATE': '0101', 
@@ -274,8 +274,13 @@ if __name__ == "__main__":
     
     run_scraper()
     
-    schedule.every(1).hours.do(run_scraper)
-    
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
+    # Exit if running in GitHub Actions (to avoid infinite loop)
+    if os.getenv('GITHUB_ACTIONS') == 'true':
+        print("  [Info] GitHub Actions execution complete. Exiting.")
+    else:
+        # Local loop mode
+        schedule.every(1).hours.do(run_scraper)
+        
+        while True:
+            schedule.run_pending()
+            time.sleep(1)

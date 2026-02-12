@@ -197,7 +197,7 @@ def process_article(page, article_id, mmdd):
     found_links = []
     
     try:
-        page.wait_for_selector(".CommentBox, .CommentItem, .comment_box", timeout=5000)
+        page.wait_for_selector(".CommentBox, .CommentItem, .comment_box", timeout=15000)
         time.sleep(1) 
         
         for page_num in range(1, 6):
@@ -284,4 +284,5 @@ if __name__ == "__main__":
         while True:
             schedule.run_pending()
             time.sleep(1)
+
 

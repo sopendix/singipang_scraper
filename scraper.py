@@ -132,7 +132,7 @@ def run_scraper():
 
                 while current_page <= max_pages:
                     try:
-                        page.wait_for_selector("a[href*='articles'], a[href*='articleid']", timeout=5000)
+                        page.wait_for_selector("a[href*='articles'], a[href*='articleid']", timeout=15000)
                     except:
                         pass # No articles or load error
 
@@ -284,3 +284,4 @@ if __name__ == "__main__":
         while True:
             schedule.run_pending()
             time.sleep(1)
+

@@ -108,7 +108,7 @@ def run_scraper():
                 page.goto(list_url, wait_until="networkidle")
                 
                 try:
-                    page.wait_for_selector("a[href*='articles'], a[href*='articleid']", timeout=10000)
+                    page.wait_for_selector("a[href*='articles'], a[href*='articleid']", timeout=12000)
                 except:
                     if "로그인" in page.title() or "nid.naver.com" in page.url:
                         print("  [Action Required] Login Page Detected!!")
@@ -132,7 +132,7 @@ def run_scraper():
 
                 while current_page <= max_pages:
                     try:
-                        page.wait_for_selector("a[href*='articles'], a[href*='articleid']", timeout=5000)
+                        page.wait_for_selector("a[href*='articles'], a[href*='articleid']", timeout=12000)
                     except:
                         pass # No articles or load error
 
@@ -313,5 +313,6 @@ if __name__ == "__main__":
         while True:
             schedule.run_pending()
             time.sleep(1)
+
 
 

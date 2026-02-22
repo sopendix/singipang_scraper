@@ -13,8 +13,8 @@ CONFIG = {
     'KEYWORD_TITLE_PART': '출석체크',
     'KEYWORD_COMMENT': 'musinsa',
     # Days back mode (Easy)
-    'USE_DATE_RANGE': False, # If True, use START_DATE ~ END_DATE. If False, use CHECK_DAYS_BACK.
-    'CHECK_DAYS_BACK': 2,
+    'USE_DATE_RANGE': True, # If True, use START_DATE ~ END_DATE. If False, use CHECK_DAYS_BACK.
+    'CHECK_DAYS_BACK': 7,
 
     # Date Range mode (Specific) - format: 'MMDD' (e.g., '0201')
     'START_DATE': '0101', 
@@ -132,7 +132,7 @@ def run_scraper():
 
                 while current_page <= max_pages:
                     try:
-                        page.wait_for_selector("a[href*='articles'], a[href*='articleid']", timeout=15000)
+                        page.wait_for_selector("a[href*='articles'], a[href*='articleid']", timeout=5000)
                     except:
                         pass # No articles or load error
 
@@ -188,15 +188,43 @@ def run_scraper():
     
     print("Scan Complete.")
 
+def extract_sheet_label(page):
+    """Extract only the text between '정답' and '1.' for GAS sheet naming."""
+    try:
+        text_blocks = page.locator("div.se-module.se-module-text").all_inner_texts()
+        if not text_blocks:
+            return ""
+
+        merged_text = re.sub(r"\s+", " ", " ".join(text_blocks)).strip()
+        if not merged_text:
+            return ""
+
+        # Capture only the label text between '정답' and '1.'.
+        answer_match = re.search(r"\uc815\ub2f5\s*[:：]?\s*(.*?)\s*1\.", merged_text, re.DOTALL)
+        if answer_match:
+            return re.sub(r"\s+", " ", answer_match.group(1)).strip()
+
+        return ""
+    except Exception as e:
+        print(f"  [Warn] Failed to extract sheet label: {e}")
+        return ""
+
 def process_article(page, article_id, mmdd):
     print(f"  [Comments] Parsing Article {article_id}...")
     
     article_url = f"https://cafe.naver.com/ca-fe/cafes/{CONFIG['CLUB_ID']}/articles/{article_id}"
     page.goto(article_url, wait_until="domcontentloaded")
     
+    sheet_label = extract_sheet_label(page)
+    if sheet_label:
+        print(f"  [TitleHint] Extracted sheet label ({len(sheet_label)} chars).")
+    else:
+        print("  [TitleHint] Sheet label not found; GAS will use MMDD only.")
+
     found_links = []
     
     try:
+        # Increase timeout for comments to load (5s -> 15s)
         page.wait_for_selector(".CommentBox, .CommentItem, .comment_box", timeout=15000)
         time.sleep(1) 
         
@@ -204,7 +232,7 @@ def process_article(page, article_id, mmdd):
             print(f"    [Page {page_num}] Scanning comments...")
             
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            time.sleep(1)
+            time.sleep(2) # Increase wait after scroll
 
             comments = page.locator("ul.comment_list > li").all()
             if len(comments) == 0:
@@ -249,18 +277,19 @@ def process_article(page, article_id, mmdd):
         if CONFIG.get('SAVE_KEYCODES_ONLY'):
             save_keycodes(found_links)
             
-        send_to_gas(found_links, mmdd)
+        send_to_gas(found_links, mmdd, sheet_label)
         
     except Exception as e:
         print(f"  [Error] Reading comments: {e}")
 
-def send_to_gas(items, mmdd):
+def send_to_gas(items, mmdd, sheet_label=""):
     if not items:
         return
     
     payload = {
         'date': mmdd,
-        'items': items
+        'items': items,
+        'sheetLabel': sheet_label
     }
     
     try:
@@ -284,5 +313,3 @@ if __name__ == "__main__":
         while True:
             schedule.run_pending()
             time.sleep(1)
-
-

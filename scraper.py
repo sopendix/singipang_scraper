@@ -189,22 +189,22 @@ def run_scraper():
     print("Scan Complete.")
 
 def extract_sheet_label(page):
-    """Extract only the text between '정답' and '1.' for GAS sheet naming."""
     try:
+        page.wait_for_selector("div.se-module.se-module-text", timeout=8000)
         text_blocks = page.locator("div.se-module.se-module-text").all_inner_texts()
-        if not text_blocks:
-            return ""
+        merged_text = " ".join(text_blocks)
 
-        merged_text = re.sub(r"\s+", " ", " ".join(text_blocks)).strip()
-        if not merged_text:
-            return ""
+        # 핵심: 제로폭/특수 공백 제거
+        merged_text = re.sub(r"[\u200b\u200c\u200d\ufeff\xa0]", " ", merged_text)
+        merged_text = re.sub(r"\s+", " ", merged_text).strip()
 
-        # Capture only the label text between '정답' and '1.'.
-        answer_match = re.search(r"\uc815\ub2f5\s*[:：]?\s*(.*?)\s*1\.", merged_text, re.DOTALL)
-        if answer_match:
-            return re.sub(r"\s+", " ", answer_match.group(1)).strip()
-
-        return ""
+        # 1. / 1) / 1번 모두 허용
+        m = re.search(
+            r"정답\s*[:：]?\s*(.*?)(?=\s*(?:1[.)]|1번))",
+            merged_text,
+            re.DOTALL
+        )
+        return m.group(1).strip() if m else ""
     except Exception as e:
         print(f"  [Warn] Failed to extract sheet label: {e}")
         return ""
@@ -313,6 +313,7 @@ if __name__ == "__main__":
         while True:
             schedule.run_pending()
             time.sleep(1)
+
 
 
 

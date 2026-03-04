@@ -10,11 +10,10 @@ from playwright.sync_api import sync_playwright
 CONFIG = {
     'CLUB_ID': '31420530',
     'MENU_ID': '21',
-    'KEYWORD_TITLE_PART': '출석체크',
     'KEYWORD_COMMENT': 'musinsa',
     # Days back mode (Easy)
-    'USE_DATE_RANGE': False, # If True, use START_DATE ~ END_DATE. If False, use CHECK_DAYS_BACK.
-    'CHECK_DAYS_BACK': 3,
+    'USE_DATE_RANGE': True, # If True, use START_DATE ~ END_DATE. If False, use CHECK_DAYS_BACK.
+    'CHECK_DAYS_BACK': 7,
 
     # Date Range mode (Specific) - format: 'MMDD' (e.g., '0201')
     'START_DATE': '0101', 
@@ -30,7 +29,7 @@ def get_date_range():
         dates = []
         for i in range(CONFIG['CHECK_DAYS_BACK']):
             date = datetime.datetime.now() - datetime.timedelta(days=i)
-            dates.append(date.strftime('%m%d'))
+            dates.append(date.date())
         return dates
     else:
         # Range logic: START_DATE ~ END_DATE
@@ -40,8 +39,8 @@ def get_date_range():
         
         # Assume current year (careful around year boundary, but simplistic for now)
         year = datetime.datetime.now().year
-        start_dt = datetime.datetime.strptime(f"{year}{start_str}", "%Y%m%d")
-        end_dt = datetime.datetime.strptime(f"{year}{end_str}", "%Y%m%d")
+        start_dt = datetime.datetime.strptime(f"{year}{start_str}", "%Y%m%d").date()
+        end_dt = datetime.datetime.strptime(f"{year}{end_str}", "%Y%m%d").date()
         
         # If end < start (e.g. over new year), adjust start year (not perfect but simple)
         if end_dt < start_dt:
@@ -50,12 +49,19 @@ def get_date_range():
         delta = end_dt - start_dt
         for i in range(delta.days + 1):
             d = start_dt + datetime.timedelta(days=i)
-            dates.append(d.strftime('%m%d'))
+            dates.append(d)
         
         # Reverse to process latest first? Or asc? Original logic was desc (today -> past).
         # Let's sort descending (latest first) to match original behavior
         dates.sort(reverse=True)
         return dates
+
+def is_target_article_title(title_text, target_date):
+    """Match titles like: AI 무퀴즈 YYMMDD {정답}"""
+    normalized = re.sub(r"\s+", " ", title_text).strip()
+    yymmdd = target_date.strftime('%y%m%d')
+    pattern = rf"^AI\s*무퀴즈\s*{yymmdd}\b"
+    return re.search(pattern, normalized, re.IGNORECASE) is not None
 
 def save_keycodes(items):
     km_file = "keycodes.txt"
@@ -100,15 +106,17 @@ def run_scraper():
         context = browser.new_context(**context_args)
         page = context.new_page()
 
-        for mmdd in get_date_range():
-            print(f"Checking Date: {mmdd}")
+        for target_date in get_date_range():
+            mmdd = target_date.strftime('%m%d')
+            yymmdd = target_date.strftime('%y%m%d')
+            print(f"Checking Date: {mmdd} (Title YYMMDD: {yymmdd})")
             
             try:
                 list_url = f"https://cafe.naver.com/f-e/cafes/{CONFIG['CLUB_ID']}/menus/{CONFIG['MENU_ID']}?viewType=L"
                 page.goto(list_url, wait_until="networkidle")
                 
                 try:
-                    page.wait_for_selector("a[href*='articles'], a[href*='articleid']", timeout=12000)
+                    page.wait_for_selector("a[href*='articles'], a[href*='articleid']", timeout=10000)
                 except:
                     if "로그인" in page.title() or "nid.naver.com" in page.url:
                         print("  [Action Required] Login Page Detected!!")
@@ -132,7 +140,7 @@ def run_scraper():
 
                 while current_page <= max_pages:
                     try:
-                        page.wait_for_selector("a[href*='articles'], a[href*='articleid']", timeout=12000)
+                        page.wait_for_selector("a[href*='articles'], a[href*='articleid']", timeout=5000)
                     except:
                         pass # No articles or load error
 
@@ -145,7 +153,7 @@ def run_scraper():
                         text = link.inner_text().strip()
                         href = link.get_attribute("href") or ""
                         
-                        if CONFIG['KEYWORD_TITLE_PART'] in text and mmdd in text:
+                        if is_target_article_title(text, target_date):
                             match = re.search(r'articles/(\d+)', href) or re.search(r'articleid=(\d+)', href)
                             
                             if match:
@@ -189,22 +197,22 @@ def run_scraper():
     print("Scan Complete.")
 
 def extract_sheet_label(page):
+    """Extract only the text between '정답' and '1.' for GAS sheet naming."""
     try:
-        page.wait_for_selector("div.se-module.se-module-text", timeout=8000)
         text_blocks = page.locator("div.se-module.se-module-text").all_inner_texts()
-        merged_text = " ".join(text_blocks)
+        if not text_blocks:
+            return ""
 
-        # 핵심: 제로폭/특수 공백 제거
-        merged_text = re.sub(r"[\u200b\u200c\u200d\ufeff\xa0]", " ", merged_text)
-        merged_text = re.sub(r"\s+", " ", merged_text).strip()
+        merged_text = re.sub(r"\s+", " ", " ".join(text_blocks)).strip()
+        if not merged_text:
+            return ""
 
-        # 1. / 1) / 1번 모두 허용
-        m = re.search(
-            r"정답\s*[:：]?\s*(.*?)(?=\s*(?:1[.)]|1번))",
-            merged_text,
-            re.DOTALL
-        )
-        return m.group(1).strip() if m else ""
+        # Capture only the label text between '정답' and '1.'.
+        answer_match = re.search(r"\uc815\ub2f5\s*[:：]?\s*(.*?)\s*1\.", merged_text, re.DOTALL)
+        if answer_match:
+            return re.sub(r"\s+", " ", answer_match.group(1)).strip()
+
+        return ""
     except Exception as e:
         print(f"  [Warn] Failed to extract sheet label: {e}")
         return ""
@@ -313,8 +321,3 @@ if __name__ == "__main__":
         while True:
             schedule.run_pending()
             time.sleep(1)
-
-
-
-
-

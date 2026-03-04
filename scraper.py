@@ -57,11 +57,20 @@ def get_date_range():
         return dates
 
 def is_target_article_title(title_text, target_date):
-    """Match titles like: AI 무퀴즈 YYMMDD {정답}"""
+    """Match titles like: AI 臾댄댁쫰 YYMMDD {?뺣떟}"""
     normalized = re.sub(r"\s+", " ", title_text).strip()
     yymmdd = target_date.strftime('%y%m%d')
     pattern = rf"^AI\s*무퀴즈\s*{yymmdd}\b"
     return re.search(pattern, normalized, re.IGNORECASE) is not None
+
+def extract_sheet_label_from_title(title_text, target_date):
+    """Extract label from titles like: AI 무퀴즈 YYMMDD {정답}"""
+    normalized = re.sub(r"\s+", " ", title_text).strip()
+    yymmdd = target_date.strftime('%y%m%d')
+    match = re.search(rf"^AI\s*무퀴즈\s*{yymmdd}\s+(.+)$", normalized, re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return ""
 
 def save_keycodes(items):
     km_file = "keycodes.txt"
@@ -118,7 +127,7 @@ def run_scraper():
                 try:
                     page.wait_for_selector("a[href*='articles'], a[href*='articleid']", timeout=10000)
                 except:
-                    if "로그인" in page.title() or "nid.naver.com" in page.url:
+                    if "nid.naver.com" in page.url or "login" in page.url.lower():
                         print("  [Action Required] Login Page Detected!!")
                         print("  Please LOG IN manually in the opened browser window.")
                         print("  I will wait for 2 minutes...")
@@ -145,6 +154,7 @@ def run_scraper():
                         pass # No articles or load error
 
                     article_id = None
+                    title_label = ""
                     links = page.locator("a").all()
                     
                     for link in links:
@@ -158,12 +168,13 @@ def run_scraper():
                             
                             if match:
                                 article_id = match.group(1)
+                                title_label = extract_sheet_label_from_title(text, target_date)
                                 print(f"  [Found] Article ID: {article_id} | Title: {text}")
                                 found_for_date = True
                                 break
                                 
                     if found_for_date:
-                        process_article(page, article_id, mmdd)
+                        process_article(page, article_id, mmdd, title_label=title_label)
                         break
                     
                     # If not found, try next page
@@ -197,18 +208,24 @@ def run_scraper():
     print("Scan Complete.")
 
 def extract_sheet_label(page):
-    """Extract only the text between '정답' and '1.' for GAS sheet naming."""
+    """Extract only the text between '?뺣떟' and '1.' for GAS sheet naming."""
     try:
         text_blocks = page.locator("div.se-module.se-module-text").all_inner_texts()
         if not text_blocks:
             return ""
 
-        merged_text = re.sub(r"\s+", " ", " ".join(text_blocks)).strip()
+        merged_text = " ".join(text_blocks)
+        merged_text = re.sub(r"[\u200b\u200c\u200d\ufeff\xa0]", " ", merged_text)
+        merged_text = re.sub(r"\s+", " ", merged_text).strip()
         if not merged_text:
             return ""
 
-        # Capture only the label text between '정답' and '1.'.
-        answer_match = re.search(r"\uc815\ub2f5\s*[:：]?\s*(.*?)\s*1\.", merged_text, re.DOTALL)
+        # Capture label text after "정답" until numbered steps begin.
+        answer_match = re.search(
+            r"정답\s*[:：]?\s*(.*?)(?=\s*(?:1[.)]|1번|1\s*[-:]))",
+            merged_text,
+            re.DOTALL
+        )
         if answer_match:
             return re.sub(r"\s+", " ", answer_match.group(1)).strip()
 
@@ -217,13 +234,17 @@ def extract_sheet_label(page):
         print(f"  [Warn] Failed to extract sheet label: {e}")
         return ""
 
-def process_article(page, article_id, mmdd):
+def process_article(page, article_id, mmdd, title_label=""):
     print(f"  [Comments] Parsing Article {article_id}...")
     
     article_url = f"https://cafe.naver.com/ca-fe/cafes/{CONFIG['CLUB_ID']}/articles/{article_id}"
     page.goto(article_url, wait_until="domcontentloaded")
     
     sheet_label = extract_sheet_label(page)
+    if not sheet_label and title_label:
+        sheet_label = title_label
+        print(f"  [TitleHint] Using label from article title ({len(sheet_label)} chars).")
+
     if sheet_label:
         print(f"  [TitleHint] Extracted sheet label ({len(sheet_label)} chars).")
     else:
@@ -321,4 +342,3 @@ if __name__ == "__main__":
         while True:
             schedule.run_pending()
             time.sleep(1)
-
